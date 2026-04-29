@@ -79,6 +79,40 @@ curl -X POST http://localhost:8080/api/auth/login \
 
 **Nota:** Los cursos ahora usan `professorId` (ID del profesor) en lugar del nombre del instructor.
 
+### API de Inscripciones/Registrations (Requiere autenticación)
+
+| Método | Endpoint | Acceso | Descripción |
+|--------|----------|--------|-------------|
+| GET | `/api/registrations` | Todos los roles autenticados | Lista inscripciones (filtradas por rol) |
+| GET | `/api/registrations?courseId={id}` | Todos los roles autenticados | Lista inscripciones de un curso |
+| GET | `/api/registrations?studentId={id}` | Todos los roles autenticados | Lista inscripciones de un estudiante |
+| GET | `/api/registrations/{id}` | Todos los roles autenticados | Obtiene una inscripción por ID |
+| POST | `/api/registrations` | STUDENT | Inscribe un estudiante a un curso |
+| DELETE | `/api/registrations/{id}` | ADMIN | Elimina una inscripción |
+
+**Notas:**
+- Estudiantes solo pueden inscribirse a sí mismos
+- No se permite inscribirse dos veces al mismo curso
+- El estudiante debe tener rol STUDENT
+
+### API de Evaluaciones (Requiere autenticación)
+
+| Método | Endpoint | Acceso | Descripción |
+|--------|----------|--------|-------------|
+| GET | `/api/evaluations` | ADMIN, PROFESSOR | Lista todas las evaluaciones |
+| GET | `/api/evaluations?courseId={id}` | ADMIN, PROFESSOR | Lista evaluaciones de un curso |
+| GET | `/api/evaluations/{id}` | ADMIN, PROFESSOR | Obtiene una evaluación por ID |
+| POST | `/api/evaluations` | ADMIN, PROFESSOR | Crea una nueva evaluación |
+| PUT | `/api/evaluations/{id}` | ADMIN, PROFESSOR | Modifica una evaluación |
+| DELETE | `/api/evaluations/{id}` | ADMIN | Elimina una evaluación |
+| GET | `/api/evaluations/{id}/grades` | ADMIN, PROFESSOR | Lista calificaciones de una evaluación |
+| POST | `/api/evaluations/{id}/grades` | ADMIN, PROFESSOR | Asigna una calificación a un estudiante |
+
+**Notas:**
+- La calificación debe estar entre 0 y el `maximumScore` de la evaluación
+- Solo estudiantes pueden recibir calificaciones
+- La fecha de aplicación debe ser futura
+
 ### Salud y monitoreo
 
 | Endpoint | Descripción |
@@ -101,38 +135,56 @@ Datos de conexión:
 src/main/java/com/duoc/LearningPlatform/
 ├── LearningPlatformApplication.java
 ├── config/
-│   ├── DataInitializer.java      # Carga datos de ejemplo
-│   └── SecurityConfig.java         # Configuración de seguridad JWT
+│   ├── DataInitializer.java         # Carga datos de ejemplo
+│   └── SecurityConfig.java          # Configuración de seguridad JWT
 ├── controller/
-│   ├── AuthController.java        # Login y autenticación
+│   ├── AuthController.java          # Login y autenticación
 │   ├── CourseController.java
-│   └── UserController.java         # Gestión de usuarios
+│   ├── EvaluationController.java    # Gestión de evaluaciones y notas
+│   ├── RegistrationController.java   # Inscripciones de estudiantes
+│   └── UserController.java          # Gestión de usuarios
 ├── service/
 │   ├── CourseService.java
-│   └── UserService.java            # Lógica de usuarios y auth
+│   ├── EvaluationService.java       # Evaluaciones y calificaciones
+│   ├── RegistrationService.java     # Inscripciones
+│   └── UserService.java             # Lógica de usuarios y auth
 ├── repository/
 │   ├── CourseRepository.java
+│   ├── EvaluationRepository.java
+│   ├── RegistrationRepository.java
+│   ├── StudentEvaluationRepository.java
 │   └── UserRepository.java
 ├── model/
 │   ├── Course.java
-│   ├── Role.java                   # Enum: ADMIN, PROFESSOR, STUDENT
-│   └── User.java                   # Entidad de usuario con password
+│   ├── Evaluation.java              # Evaluaciones de cursos
+│   ├── Registration.java            # Inscripciones estudiante-curso
+│   ├── Role.java                    # Enum: ADMIN, PROFESSOR, STUDENT
+│   ├── StudentEvaluation.java        # Calificaciones de estudiantes
+│   └── User.java                    # Entidad de usuario con password
 ├── dto/
-│   ├── CourseRequest.java          # Ahora usa professorId
+│   ├── CourseRequest.java           # Ahora usa professorId
 │   ├── CourseResponse.java
 │   ├── CreateUserRequest.java
+│   ├── EvaluationRequest.java
+│   ├── EvaluationResponse.java
 │   ├── LoginRequest.java
 │   ├── LoginResponse.java
+│   ├── RegistrationRequest.java
+│   ├── RegistrationResponse.java
+│   ├── StudentEvaluationRequest.java
+│   ├── StudentEvaluationResponse.java
 │   ├── UpdateEmailRequest.java
 │   ├── UpdateUserRequest.java
 │   └── UserResponse.java
 ├── security/
+│   ├── EvaluationSecurity.java      # Helper para permisos de evaluaciones
 │   ├── JwtAuthenticationFilter.java # Filtro de autenticación JWT
-│   ├── JwtUtil.java                # Generación/validación de tokens
-│   └── UserSecurity.java           # Helper para verificación de usuario
+│   ├── JwtUtil.java                 # Generación/validación de tokens
+│   ├── RegistrationSecurity.java    # Helper para permisos de inscripciones
+│   └── UserSecurity.java            # Helper para verificación de usuario
 └── exception/
     ├── ResourceNotFoundException.java
-    └── GlobalExceptionHandler.java # Manejo de errores auth
+    └── GlobalExceptionHandler.java  # Manejo de errores auth
 ```
 
 ## Ejemplos de uso de la API
@@ -189,6 +241,68 @@ curl http://localhost:8080/api/users \
   -H "Authorization: Bearer $TOKEN"
 ```
 
+### 6. Inscribir estudiante a curso (STUDENT)
+
+```bash
+# Login como estudiante primero
+STUDENT_TOKEN=$(curl -X POST http://localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "ana@duoc.cl", "password": "estudiante123"}' | jq -r '.token')
+
+# Inscribirse a un curso
+curl -X POST http://localhost:8080/api/registrations \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $STUDENT_TOKEN" \
+  -d '{
+    "courseId": 1,
+    "studentId": 7
+  }'
+```
+
+### 7. Listar inscripciones (cualquier rol autenticado)
+
+```bash
+curl http://localhost:8080/api/registrations \
+  -H "Authorization: Bearer $TOKEN"
+
+# Filtrar por curso
+curl http://localhost:8080/api/registrations?courseId=1 \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### 8. Crear evaluación (ADMIN o PROFESSOR)
+
+```bash
+curl -X POST http://localhost:8080/api/evaluations \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "courseId": 1,
+    "name": "Examen Parcial 1",
+    "maximumScore": 100,
+    "applicationDate": "2025-06-15T10:00:00"
+  }'
+```
+
+### 9. Asignar calificación (ADMIN o PROFESSOR)
+
+```bash
+curl -X POST http://localhost:8080/api/evaluations/1/grades \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "studentId": 7,
+    "score": 85
+  }'
+```
+
+### 10. Ver calificaciones de una evaluación (ADMIN o PROFESSOR)
+
+```bash
+curl http://localhost:8080/api/evaluations/1/grades \
+  -H "Authorization: Bearer $TOKEN"
+```
+
 ## Códigos de respuesta
 
 - `200 OK` - Petición exitosa (GET, PUT)
@@ -230,6 +344,9 @@ Al iniciar se cargan:
 - **5 profesores** con credenciales de acceso
 - **2 estudiantes** con acceso de solo lectura
 - **1 administrador** con acceso total
+- **3 inscripciones** de estudiantes a cursos
+- **3 evaluaciones** creadas para los cursos
+- **3 calificaciones** asignadas a estudiantes
 
 ## Testing
 
