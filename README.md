@@ -7,13 +7,78 @@ Plataforma de aprendizaje en línea — proyecto de arquitectura de microservici
 - Java 21
 - Maven 3.9+
 
+## Configuración de base de datos
+
+La aplicación soporta múltiples perfiles de base de datos:
+
+### Perfil local (desarrollo) - H2 Database
+
+Por defecto, la aplicación usa H2 en memoria para desarrollo local:
+
+```bash
+# Perfil local (implícito)
+./mvnw spring-boot:run
+
+# O explícitamente con perfil
+./mvnw spring-boot:run -Dspring-boot.run.profiles=local
+```
+
+**Características del perfil local:**
+- Base de datos H2 en memoria
+- Consola H2 disponible en `http://localhost:8080/h2-console`
+- Datos de ejemplo cargados automáticamente
+- Ideal para desarrollo y testing
+
+**Datos de conexión H2:**
+- JDBC URL: `jdbc:h2:mem:learningplatformdb`
+- Usuario: `sa`
+- Contraseña: (vacía)
+
+### Perfil de producción - Oracle Database
+
+Para producción, la aplicación se conecta a Oracle Database.
+
+**1. Configurar variables de entorno:**
+
+```bash
+export ORACLE_DB_URL=jdbc:oracle:thin:@//host:1521/serviceName
+export ORACLE_DB_USERNAME=tu_usuario
+export ORACLE_DB_PASSWORD=tu_password
+```
+
+**2. Ejecutar build de producción:**
+
+```bash
+./scripts/build-prod.sh
+```
+
+**3. Ejecutar con perfil prod:**
+
+```bash
+java -jar -Dspring.profiles.active=prod target/LearningPlatform-0.0.1-SNAPSHOT.jar
+```
+
+**Características del perfil prod:**
+- Conexión a Oracle Database
+- Datos de ejemplo NO se cargan automáticamente
+- H2 Console deshabilitada
+- Configuración de connection pool optimizada
+
 ## Ejecutar la aplicación
+
+### Modo desarrollo (H2)
 
 ```bash
 ./mvnw spring-boot:run
 ```
 
 La aplicación queda disponible en `http://localhost:8080`
+
+### Archivos de configuración
+
+- `application.properties` - Configuración común
+- `application-local.properties` - Configuración H2 (desarrollo)
+- `application-prod.properties` - Configuración Oracle (producción)
 
 ## Autenticación
 
@@ -120,9 +185,11 @@ curl -X POST http://localhost:8080/api/auth/login \
 | `/actuator/health` | Estado de salud de la aplicación |
 | `/actuator/info` | Información de la aplicación |
 
-### Consola H2 (desarrollo)
+### Consola H2 (desarrollo - solo perfil local)
 
-Consola de la base H2: `http://localhost:8080/h2-console`
+La consola H2 está disponible solo en el perfil `local`:
+
+URL: `http://localhost:8080/h2-console`
 
 Datos de conexión:
 - JDBC URL: `jdbc:h2:mem:learningplatformdb`
@@ -357,9 +424,46 @@ La aplicación incluye tests siguiendo TDD:
 ./mvnw test
 ```
 
+**Nota:** Los tests usan H2 (perfil de test) para garantizar consistencia y no requieren conexión a Oracle.
+
 Estructura de tests:
 - `model/` - Tests unitarios de entidades
 - `repository/` - Tests de integración con `@DataJpaTest`
 - `service/` - Tests unitarios con Mockito
 - `controller/` - Tests de integración con `@WebMvcTest`
 - `AuthenticationE2ETest` - Tests end-to-end de autenticación
+
+## Build para producción
+
+### Script de build automatizado
+
+```bash
+# Configurar variables de entorno primero
+export ORACLE_DB_URL=jdbc:oracle:thin:@//tu-host:1521/tu-servicio
+export ORACLE_DB_USERNAME=tu_usuario
+export ORACLE_DB_PASSWORD=tu_password
+
+# Ejecutar build de producción
+./scripts/build-prod.sh
+```
+
+El script valida que todas las variables requeridas estén configuradas antes de compilar.
+
+### Variables de entorno requeridas para producción
+
+| Variable | Descripción | Ejemplo |
+|----------|-------------|---------|
+| `ORACLE_DB_URL` | URL JDBC de conexión Oracle | `jdbc:oracle:thin:@//host:1521/SERVICE` |
+| `ORACLE_DB_USERNAME` | Usuario de base de datos | `learning_user` |
+| `ORACLE_DB_PASSWORD` | Contraseña de base de datos | (secreto) |
+
+### Ejemplo de archivo .env
+
+Copia `.env.example` a `.env` y configura tus valores:
+
+```bash
+cp .env.example .env
+# Edita .env con tus credenciales reales
+```
+
+**Importante:** Nunca incluyas el archivo `.env` en el control de versiones.

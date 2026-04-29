@@ -12,6 +12,7 @@ import com.duoc.LearningPlatform.repository.RegistrationRepository;
 import com.duoc.LearningPlatform.repository.StudentEvaluationRepository;
 import com.duoc.LearningPlatform.repository.UserRepository;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 
 @Component
+@ConditionalOnProperty(name = "app.data.initializer.enabled", havingValue = "true")
 public class DataInitializer implements CommandLineRunner {
 
     private final CourseRepository courseRepository;
