@@ -21,24 +21,24 @@ public class Course {
     @Column(length = 1000)
     private String description;
 
-    @Column(nullable = false)
-    private String instructor;
+    @Column(name = "professor_id", nullable = false)
+    private Long professorId;
 
     @Column(nullable = false)
     private boolean active;
 
     protected Course() {}
 
-    public Course(String title, String description, String instructor) {
+    public Course(String title, String description, Long professorId) {
         if (title == null || title.isBlank()) {
             throw new IllegalArgumentException("Course title cannot be empty");
         }
-        if (instructor == null || instructor.isBlank()) {
-            throw new IllegalArgumentException("Instructor name cannot be empty");
+        if (professorId == null) {
+            throw new IllegalArgumentException("Professor ID cannot be null");
         }
         this.title = title;
         this.description = description;
-        this.instructor = instructor;
+        this.professorId = professorId;
         this.active = true;
     }
 
@@ -50,16 +50,16 @@ public class Course {
         this.active = false;
     }
 
-    public void updateDetails(String title, String description, String instructor) {
+    public void updateDetails(String title, String description, Long professorId) {
         if (title == null || title.isBlank()) {
             throw new IllegalArgumentException("Course title cannot be empty");
         }
-        if (instructor == null || instructor.isBlank()) {
-            throw new IllegalArgumentException("Instructor name cannot be empty");
+        if (professorId == null) {
+            throw new IllegalArgumentException("Professor ID cannot be null");
         }
         this.title = title;
         this.description = description;
-        this.instructor = instructor;
+        this.professorId = professorId;
     }
 
     public Long getId() {
@@ -74,8 +74,8 @@ public class Course {
         return description;
     }
 
-    public String getInstructor() {
-        return instructor;
+    public Long getProfessorId() {
+        return professorId;
     }
 
     public boolean isActive() {

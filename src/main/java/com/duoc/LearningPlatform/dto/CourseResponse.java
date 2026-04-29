@@ -7,7 +7,7 @@ public class CourseResponse {
     private Long id;
     private String title;
     private String description;
-    private String instructor;
+    private Long professorId;
     private boolean active;
 
     public static CourseResponse fromEntity(Course course) {
@@ -15,7 +15,7 @@ public class CourseResponse {
         response.id = course.getId();
         response.title = course.getTitle();
         response.description = course.getDescription();
-        response.instructor = course.getInstructor();
+        response.professorId = course.getProfessorId();
         response.active = course.isActive();
         return response;
     }
@@ -44,12 +44,12 @@ public class CourseResponse {
         this.description = description;
     }
 
-    public String getInstructor() {
-        return instructor;
+    public Long getProfessorId() {
+        return professorId;
     }
 
-    public void setInstructor(String instructor) {
-        this.instructor = instructor;
+    public void setProfessorId(Long professorId) {
+        this.professorId = professorId;
     }
 
     public boolean isActive() {

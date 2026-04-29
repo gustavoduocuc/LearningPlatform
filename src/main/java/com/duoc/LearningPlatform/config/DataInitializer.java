@@ -1,49 +1,86 @@
 package com.duoc.LearningPlatform.config;
 
 import com.duoc.LearningPlatform.model.Course;
+import com.duoc.LearningPlatform.model.Role;
+import com.duoc.LearningPlatform.model.User;
 import com.duoc.LearningPlatform.repository.CourseRepository;
+import com.duoc.LearningPlatform.repository.UserRepository;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 @Component
 public class DataInitializer implements CommandLineRunner {
 
     private final CourseRepository courseRepository;
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
 
-    public DataInitializer(CourseRepository courseRepository) {
+    public DataInitializer(CourseRepository courseRepository,
+                           UserRepository userRepository,
+                           PasswordEncoder passwordEncoder) {
         this.courseRepository = courseRepository;
+        this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @Override
+    @Transactional
     public void run(String... args) {
+        if (userRepository.count() > 0) {
+            System.out.println("Datos ya inicializados, omitiendo...");
+            return;
+        }
+
+        User admin = new User("Administrador", "admin@duoc.cl", passwordEncoder.encode("admin123"), Role.ADMIN);
+
+        User professor1 = new User("Juan Pérez", "juan.perez@duoc.cl", passwordEncoder.encode("profesor123"), Role.PROFESSOR);
+        User professor2 = new User("María López", "maria.lopez@duoc.cl", passwordEncoder.encode("profesor123"), Role.PROFESSOR);
+        User professor3 = new User("Carlos García", "carlos.garcia@duoc.cl", passwordEncoder.encode("profesor123"), Role.PROFESSOR);
+        User professor4 = new User("María Rodríguez", "maria.rodriguez@duoc.cl", passwordEncoder.encode("profesor123"), Role.PROFESSOR);
+        User professor5 = new User("Roberto Vega", "roberto.vega@duoc.cl", passwordEncoder.encode("profesor123"), Role.PROFESSOR);
+
+        User student1 = new User("Ana Student", "ana@duoc.cl", passwordEncoder.encode("estudiante123"), Role.STUDENT);
+        User student2 = new User("Pedro Student", "pedro@duoc.cl", passwordEncoder.encode("estudiante123"), Role.STUDENT);
+
+        User savedAdmin = userRepository.save(admin);
+        User savedProf1 = userRepository.save(professor1);
+        User savedProf2 = userRepository.save(professor2);
+        User savedProf3 = userRepository.save(professor3);
+        User savedProf4 = userRepository.save(professor4);
+        User savedProf5 = userRepository.save(professor5);
+        userRepository.save(student1);
+        userRepository.save(student2);
+
         Course java = new Course(
                 "Introducción a Java",
                 "Aprende los fundamentos de programación en Java, incluyendo conceptos de POO",
-                "Juan Pérez"
+                savedProf1.getId()
         );
 
         Course python = new Course(
                 "Python para ciencia de datos",
                 "Domina Python para análisis de datos y aprendizaje automático",
-                "María López"
+                savedProf2.getId()
         );
 
         Course web = new Course(
                 "Desarrollo web con Spring Boot",
                 "Construye APIs REST y aplicaciones web con Spring Boot",
-                "Carlos García"
+                savedProf3.getId()
         );
 
         Course database = new Course(
                 "Diseño de bases de datos y SQL",
                 "Aprende diseño de bases de datos relacionales y consultas SQL",
-                "María Rodríguez"
+                savedProf4.getId()
         );
 
         Course inactive = new Course(
                 "Mantenimiento de sistemas legados",
                 "Mantenimiento de sistemas COBOL heredados",
-                "Roberto Vega"
+                savedProf5.getId()
         );
         inactive.deactivate();
 
@@ -53,6 +90,12 @@ public class DataInitializer implements CommandLineRunner {
         courseRepository.save(database);
         courseRepository.save(inactive);
 
-        System.out.println("Cursos de ejemplo cargados: " + courseRepository.count() + " cursos");
+        System.out.println("=== Datos de ejemplo cargados ===");
+        System.out.println("Usuarios: " + userRepository.count());
+        System.out.println("  - Admin: admin@duoc.cl / admin123");
+        System.out.println("  - Profesores: " + professor1.getEmail() + ", " + professor2.getEmail() + ", etc. / profesor123");
+        System.out.println("  - Estudiantes: " + student1.getEmail() + ", etc. / estudiante123");
+        System.out.println("Cursos: " + courseRepository.count());
+        System.out.println("=================================");
     }
 }

@@ -1,6 +1,7 @@
 package com.duoc.LearningPlatform.dto;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 
 public class CourseRequest {
 
@@ -9,8 +10,8 @@ public class CourseRequest {
 
     private String description;
 
-    @NotBlank(message = "instructor is required")
-    private String instructor;
+    @NotNull(message = "professorId is required")
+    private Long professorId;
 
     public String getTitle() {
         return title;
@@ -28,11 +29,11 @@ public class CourseRequest {
         this.description = description;
     }
 
-    public String getInstructor() {
-        return instructor;
+    public Long getProfessorId() {
+        return professorId;
     }
 
-    public void setInstructor(String instructor) {
-        this.instructor = instructor;
+    public void setProfessorId(Long professorId) {
+        this.professorId = professorId;
     }
 }

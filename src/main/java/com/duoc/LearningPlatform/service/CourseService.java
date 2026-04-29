@@ -2,7 +2,10 @@ package com.duoc.LearningPlatform.service;
 
 import com.duoc.LearningPlatform.exception.ResourceNotFoundException;
 import com.duoc.LearningPlatform.model.Course;
+import com.duoc.LearningPlatform.model.Role;
+import com.duoc.LearningPlatform.model.User;
 import com.duoc.LearningPlatform.repository.CourseRepository;
+import com.duoc.LearningPlatform.repository.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -14,9 +17,11 @@ import java.util.List;
 public class CourseService {
 
     private final CourseRepository courseRepository;
+    private final UserRepository userRepository;
 
-    public CourseService(CourseRepository courseRepository) {
+    public CourseService(CourseRepository courseRepository, UserRepository userRepository) {
         this.courseRepository = courseRepository;
+        this.userRepository = userRepository;
     }
 
     public List<Course> findActiveCourses() {
@@ -41,15 +46,17 @@ public class CourseService {
     }
 
     @Transactional
-    public Course createCourse(String title, String description, String instructor) {
-        Course course = new Course(title, description, instructor);
+    public Course createCourse(String title, String description, Long professorId) {
+        validateProfessor(professorId);
+        Course course = new Course(title, description, professorId);
         return courseRepository.save(course);
     }
 
     @Transactional
-    public Course updateCourse(Long id, String title, String description, String instructor) {
+    public Course updateCourse(Long id, String title, String description, Long professorId) {
+        validateProfessor(professorId);
         Course course = getCourse(id);
-        course.updateDetails(title, description, instructor);
+        course.updateDetails(title, description, professorId);
         return courseRepository.save(course);
     }
 
@@ -73,5 +80,14 @@ public class CourseService {
         Course course = getCourse(id);
         course.deactivate();
         return courseRepository.save(course);
+    }
+
+    private void validateProfessor(Long professorId) {
+        User user = userRepository.findById(professorId)
+                .orElseThrow(() -> new IllegalArgumentException("Professor not found with id: " + professorId));
+
+        if (user.getRole() != Role.PROFESSOR && user.getRole() != Role.ADMIN) {
+            throw new IllegalArgumentException("User with id " + professorId + " is not a professor");
+        }
     }
 }
