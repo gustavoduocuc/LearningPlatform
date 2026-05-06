@@ -119,6 +119,18 @@ curl -X POST http://localhost:8080/api/auth/login \
   -d '{"email": "admin@duoc.cl", "password": "admin123"}'
 ```
 
+**Recuperación de contraseña (OTP):**
+```bash
+# Solicitar código OTP
+curl -X POST http://localhost:8080/api/auth/forgot-password \
+  -H "Content-Type: application/json" \
+  -d '{"email": "usuario@duoc.cl"}'
+# Resetear contraseña con OTP
+curl -X POST http://localhost:8080/api/auth/reset-password \
+  -H "Content-Type: application/json" \
+  -d '{"email": "usuario@duoc.cl", "otp": "123456", "newPassword": "nuevaPass123"}'
+```
+
 ### API de Usuarios (Requiere autenticación)
 
 | Método | Endpoint | Acceso | Descripción |
@@ -205,12 +217,13 @@ src/main/java/com/duoc/LearningPlatform/
 │   ├── DataInitializer.java         # Carga datos de ejemplo
 │   └── SecurityConfig.java          # Configuración de seguridad JWT
 ├── controller/
-│   ├── AuthController.java          # Login y autenticación
+│   ├── AuthController.java          # Login, autenticación y recuperación de contraseña
 │   ├── CourseController.java
 │   ├── EvaluationController.java    # Gestión de evaluaciones y notas
 │   ├── RegistrationController.java   # Inscripciones de estudiantes
 │   └── UserController.java          # Gestión de usuarios
 ├── service/
+│   ├── ConsolePasswordResetOtpNotifier.java  # Envío OTP a consola (logs)
 │   ├── CourseService.java
 │   ├── EvaluationService.java       # Evaluaciones y calificaciones
 │   ├── RegistrationService.java     # Inscripciones
@@ -218,12 +231,14 @@ src/main/java/com/duoc/LearningPlatform/
 ├── repository/
 │   ├── CourseRepository.java
 │   ├── EvaluationRepository.java
+│   ├── PasswordResetCodeRepository.java  # Códigos OTP de recuperación
 │   ├── RegistrationRepository.java
 │   ├── StudentEvaluationRepository.java
 │   └── UserRepository.java
 ├── model/
 │   ├── Course.java
 │   ├── Evaluation.java              # Evaluaciones de cursos
+│   ├── PasswordResetCode.java       # Códigos OTP para recuperación de contraseña
 │   ├── Registration.java            # Inscripciones estudiante-curso
 │   ├── Role.java                    # Enum: ADMIN, PROFESSOR, STUDENT
 │   ├── StudentEvaluation.java        # Calificaciones de estudiantes
@@ -234,6 +249,7 @@ src/main/java/com/duoc/LearningPlatform/
 │   ├── CreateUserRequest.java
 │   ├── EvaluationRequest.java
 │   ├── EvaluationResponse.java
+│   ├── ForgotPasswordRequest.java   # Solicitud de recuperación de contraseña
 │   ├── LoginRequest.java
 │   ├── LoginResponse.java
 │   ├── RegistrationRequest.java

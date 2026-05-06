@@ -43,6 +43,8 @@ public class SecurityConfig {
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/login").permitAll()
+                .requestMatchers("/api/auth/forgot-password").permitAll()
+                .requestMatchers("/api/auth/reset-password").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/courses").authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/courses/{id}").authenticated()
                 .requestMatchers(HttpMethod.PUT, "/api/courses/{id}").hasAnyRole("ADMIN", "PROFESSOR")

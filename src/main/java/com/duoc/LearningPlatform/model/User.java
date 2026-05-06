@@ -90,6 +90,13 @@ public class User {
         return passwordEncoder.matches(rawPassword, this.password);
     }
 
+    public void updateEncodedPassword(String encodedPassword) {
+        if (encodedPassword == null || encodedPassword.isBlank()) {
+            throw new IllegalArgumentException("Password cannot be empty");
+        }
+        this.password = encodedPassword;
+    }
+
     private void validateName(String name) {
         if (name == null || name.isBlank()) {
             throw new IllegalArgumentException("User name cannot be empty");

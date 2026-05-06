@@ -149,4 +149,33 @@ class UserTest {
         assertNotNull(Role.PROFESSOR);
         assertNotNull(Role.STUDENT);
     }
+
+    @Test
+    void updatesEncodedPasswordSuccessfully() {
+        User user = new User("John Doe", "john@example.com", "oldPassword", Role.STUDENT);
+        String newEncodedPassword = passwordEncoder.encode("newPassword123");
+
+        user.updateEncodedPassword(newEncodedPassword);
+
+        assertEquals(newEncodedPassword, user.getPassword());
+        assertTrue(user.validatePassword("newPassword123", passwordEncoder));
+    }
+
+    @Test
+    void rejectsNullEncodedPassword() {
+        User user = new User("John Doe", "john@example.com", "password123", Role.STUDENT);
+
+        assertThrows(IllegalArgumentException.class, () -> {
+            user.updateEncodedPassword(null);
+        });
+    }
+
+    @Test
+    void rejectsBlankEncodedPassword() {
+        User user = new User("John Doe", "john@example.com", "password123", Role.STUDENT);
+
+        assertThrows(IllegalArgumentException.class, () -> {
+            user.updateEncodedPassword("   ");
+        });
+    }
 }
