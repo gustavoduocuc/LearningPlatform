@@ -90,9 +90,9 @@ Authorization: Bearer <token>
 
 ### Roles de usuario
 
-- **ADMIN**: Acceso completo a todos los endpoints
-- **PROFESSOR**: Puede gestionar cursos y ver usuarios
-- **STUDENT**: Solo lectura de cursos activos
+- **ADMIN**: Acceso completo a todos los endpoints; puede crear, listar y eliminar notificaciones de cualquier usuario
+- **PROFESSOR**: Puede gestionar cursos y ver usuarios; puede listar, consultar, marcar como leídas y eliminar **sus propias** notificaciones
+- **STUDENT**: Lectura de cursos activos; puede crear y consultar sus propios pagos simulados (tras inscribirse en el curso); puede listar, consultar, marcar como leídas y eliminar **sus propias** notificaciones
 
 ### Usuarios de prueba
 
@@ -172,6 +172,47 @@ curl -X POST http://localhost:8080/api/auth/reset-password \
 - No se permite inscribirse dos veces al mismo curso
 - El estudiante debe tener rol STUDENT
 
+### API de Pagos / Payments (simulado, requiere autenticación)
+
+Este módulo representa el flujo de pago por matrícula en un curso. El procesamiento se simula: al crear un pago válido, el registro queda normalmente en estado `APPROVED` con una `transactionReference` generada (prefijo `SIM-`). En una arquitectura de microservicios real, esta lógica viviría en un **Payment Service** y se conectaría a un proveedor externo (PSP).
+
+| Método | Endpoint | Acceso | Descripción |
+|--------|----------|--------|-------------|
+| POST | `/api/payments` | STUDENT | Crea un pago simulado para un curso (el estudiante es siempre el del JWT) |
+| GET | `/api/payments` | ADMIN, STUDENT | ADMIN lista todos los pagos; STUDENT solo los propios |
+| GET | `/api/payments/{id}` | ADMIN, STUDENT | ADMIN ve cualquier pago; STUDENT solo el suyo |
+| PUT | `/api/payments/{id}/status` | ADMIN | Actualiza el estado con transiciones válidas |
+| PUT | `/api/payments/{id}/cancel` | ADMIN | Cancela el pago (`CANCELLED`) cuando corresponde |
+
+**Notas:**
+
+- Debe existir una **inscripción** (`Registration`) para el par estudiante-curso antes de pagar.
+- El curso debe existir; el monto debe ser mayor que cero; `paymentMethod` obligatorio (`CREDIT_CARD` o `BANK_TRANSFER`).
+- No puede haber más de un pago **APPROVED** por el mismo estudiante y curso.
+- Transiciones de estado (ADMIN): desde `PENDING` → `APPROVED`, `REJECTED`, `CANCELLED`; desde `APPROVED` → `CANCELLED`; estados finales no se reactivan arbitrariamente.
+- **PROFESSOR** no utiliza estos endpoints.
+
+### API de Notificaciones (simulado, requiere autenticación)
+
+Este módulo persiste avisos para estudiantes y profesores (nuevos cursos, inscripciones, evaluaciones, pagos, etc.). **No hay envío real** por correo, SMS ni push: solo se guarda el registro y se expone por REST. En una arquitectura de microservicios real, un **Notification Service** recibiría eventos de otros servicios (cursos, matrículas, evaluaciones, pagos) y se integraría con proveedores externos o un broker de mensajes.
+
+| Método | Endpoint | Acceso | Descripción |
+|--------|----------|--------|-------------|
+| POST | `/api/notifications` | ADMIN | Crea una notificación para el `recipientId` indicado (demostración / pruebas) |
+| GET | `/api/notifications` | Autenticado | ADMIN lista todas; STUDENT y PROFESSOR solo las dirigidas a su usuario |
+| GET | `/api/notifications/me` | Autenticado | Lista solo las notificaciones del usuario del JWT (incluye ADMIN respecto a su propio usuario) |
+| GET | `/api/notifications/{id}` | Autenticado | ADMIN ve cualquier notificación; otros solo si son el destinatario |
+| PUT | `/api/notifications/{id}/read` | Autenticado | Marca como leída (idempotente si ya estaba leída) |
+| DELETE | `/api/notifications/{id}` | Autenticado | ADMIN elimina cualquiera; STUDENT y PROFESSOR solo las propias |
+
+**Reglas de negocio:**
+
+- Debe existir el usuario destinatario (`recipientId`).
+- `title` y `message` no pueden estar vacíos; `notificationType` es obligatorio.
+- Tipos admitidos: `NEW_COURSE`, `COURSE_ENROLLMENT`, `PENDING_ASSIGNMENT`, `EVALUATION_CREATED`, `GRADE_ASSIGNED`, `PAYMENT_APPROVED`, `PAYMENT_REJECTED`, `GENERAL`.
+- Si se envían `relatedCourseId`, `relatedEvaluationId` o `relatedPaymentId`, la entidad referenciada debe existir.
+- Un usuario no puede leer, marcar como leída ni borrar notificaciones de otro usuario (salvo ADMIN).
+
 ### API de Evaluaciones (Requiere autenticación)
 
 | Método | Endpoint | Acceso | Descripción |
@@ -237,25 +278,36 @@ src/main/java/com/duoc/LearningPlatform/
 │   ├── AuthController.java          # Login, autenticación y recuperación de contraseña
 │   ├── CourseController.java
 │   ├── EvaluationController.java    # Gestión de evaluaciones y notas
+│   ├── NotificationController.java # Notificaciones persistidas (entrega simulada)
+│   ├── PaymentController.java       # Pagos simulados por matrícula
 │   ├── RegistrationController.java   # Inscripciones de estudiantes
 │   └── UserController.java          # Gestión de usuarios
 ├── service/
 │   ├── ConsolePasswordResetOtpNotifier.java  # Envío OTP a consola (logs)
 │   ├── CourseService.java
 │   ├── EvaluationService.java       # Evaluaciones y calificaciones
+│   ├── NotificationService.java     # Notificaciones y permisos por rol
+│   ├── PaymentService.java          # Lógica de pagos simulados
 │   ├── RegistrationService.java     # Inscripciones
 │   └── UserService.java             # Lógica de usuarios y auth
 ├── repository/
 │   ├── CourseRepository.java
 │   ├── EvaluationRepository.java
 │   ├── PasswordResetCodeRepository.java  # Códigos OTP de recuperación
+│   ├── NotificationRepository.java
+│   ├── PaymentRepository.java
 │   ├── RegistrationRepository.java
 │   ├── StudentEvaluationRepository.java
 │   └── UserRepository.java
 ├── model/
 │   ├── Course.java
 │   ├── Evaluation.java              # Evaluaciones de cursos
+│   ├── Notification.java            # Notificaciones a usuarios (FKs opcionales por ID)
+│   ├── NotificationType.java        # Enum de tipo de notificación
 │   ├── PasswordResetCode.java       # Códigos OTP para recuperación de contraseña
+│   ├── Payment.java                 # Pagos simulados estudiante-curso
+│   ├── PaymentMethod.java           # Enum: CREDIT_CARD, BANK_TRANSFER
+│   ├── PaymentStatus.java           # Enum: PENDING, APPROVED, REJECTED, CANCELLED
 │   ├── Registration.java            # Inscripciones estudiante-curso
 │   ├── Role.java                    # Enum: ADMIN, PROFESSOR, STUDENT
 │   ├── StudentEvaluation.java        # Calificaciones de estudiantes
@@ -269,8 +321,13 @@ src/main/java/com/duoc/LearningPlatform/
 │   ├── ForgotPasswordRequest.java   # Solicitud de recuperación de contraseña
 │   ├── LoginRequest.java
 │   ├── LoginResponse.java
+│   ├── NotificationRequest.java
+│   ├── NotificationResponse.java
+│   ├── PaymentRequest.java
+│   ├── PaymentResponse.java
 │   ├── RegistrationRequest.java
 │   ├── RegistrationResponse.java
+│   ├── UpdatePaymentStatusRequest.java
 │   ├── StudentEvaluationRequest.java
 │   ├── StudentEvaluationResponse.java
 │   ├── UpdateEmailRequest.java
@@ -551,6 +608,38 @@ curl http://localhost:8080/api/evaluations/1/my-grade \
 - Retorna error 404 si el profesor aún no ha asignado una calificación
 - La nota está entre 0 y el `maximumScore` de la evaluación
 
+### Notificaciones (ADMIN crea; destinatario consulta)
+
+```bash
+# Login admin y crear notificación para un estudiante (ajusta recipientId según DataInitializer, p. ej. 7)
+ADMIN_TOKEN=$(curl -s -X POST http://localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "admin@duoc.cl", "password": "admin123"}' | jq -r '.token')
+
+curl -s -X POST http://localhost:8080/api/notifications \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -d '{
+    "recipientId": 7,
+    "title": "Nueva evaluación",
+    "message": "Tienes una evaluación pendiente en tu curso.",
+    "notificationType": "PENDING_ASSIGNMENT",
+    "relatedCourseId": 1
+  }' | jq .
+
+# Estudiante: listar solo sus notificaciones
+STUDENT_TOKEN=$(curl -s -X POST http://localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "ana@duoc.cl", "password": "estudiante123"}' | jq -r '.token')
+
+curl -s http://localhost:8080/api/notifications/me \
+  -H "Authorization: Bearer $STUDENT_TOKEN" | jq .
+
+# Marcar como leída (sustituye NOTIFICATION_ID por el id devuelto)
+curl -s -X PUT http://localhost:8080/api/notifications/NOTIFICATION_ID/read \
+  -H "Authorization: Bearer $STUDENT_TOKEN" | jq .
+```
+
 ## Códigos de respuesta
 
 - `200 OK` - Petición exitosa (GET, PUT)
@@ -609,9 +698,9 @@ La aplicación incluye tests siguiendo TDD:
 
 Estructura de tests:
 - `model/` - Tests unitarios de entidades
-- `repository/` - Tests de integración con `@DataJpaTest`
-- `service/` - Tests unitarios con Mockito
-- `controller/` - Tests de integración con `@WebMvcTest`
+- `repository/` - Tests de repositorio (en este proyecto, muchos usan Mockito sobre la interfaz del repositorio)
+- `service/` - Tests unitarios con Mockito (incluye `NotificationServiceTest`, `PaymentServiceTest`, etc.)
+- `controller/` - Tests de controlador con Mockito (`NotificationControllerTest`, `PaymentControllerTest`, etc.)
 - `AuthenticationE2ETest` - Tests end-to-end de autenticación
 
 ## Build para producción
