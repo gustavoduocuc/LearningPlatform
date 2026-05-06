@@ -150,7 +150,7 @@ curl -X POST http://localhost:8080/api/auth/reset-password \
 | GET | `/api/courses/{id}` | Todos los roles autenticados | Obtiene un curso por ID |
 | POST | `/api/courses` | ADMIN | Crea un curso |
 | PUT | `/api/courses/{id}` | ADMIN, PROFESSOR | Actualiza un curso |
-| DELETE | `/api/courses/{id}` | ADMIN | Elimina un curso |
+| DELETE | `/api/courses/{id}` | ADMIN, PROFESSOR | Elimina un curso |
 | POST | `/api/courses/{id}/activate` | ADMIN, PROFESSOR | Activa un curso |
 | POST | `/api/courses/{id}/deactivate` | ADMIN, PROFESSOR | Desactiva un curso |
 
