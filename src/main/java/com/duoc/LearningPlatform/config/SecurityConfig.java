@@ -61,6 +61,12 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/registrations/{id}").authenticated()
                 .requestMatchers(HttpMethod.POST, "/api/registrations").hasRole("STUDENT")
                 .requestMatchers(HttpMethod.DELETE, "/api/registrations/{id}").hasRole("ADMIN")
+                // Student-specific evaluation endpoints (must be before generic /{id} patterns)
+                .requestMatchers(HttpMethod.GET, "/api/evaluations/my-evaluations").hasRole("STUDENT")
+                .requestMatchers(HttpMethod.GET, "/api/evaluations/{id}/my-submission").hasRole("STUDENT")
+                .requestMatchers(HttpMethod.GET, "/api/evaluations/{id}/my-grade").hasRole("STUDENT")
+                .requestMatchers(HttpMethod.POST, "/api/evaluations/{id}/submissions").hasRole("STUDENT")
+                // Admin/Professor evaluation endpoints
                 .requestMatchers(HttpMethod.GET, "/api/evaluations").hasAnyRole("ADMIN", "PROFESSOR")
                 .requestMatchers(HttpMethod.GET, "/api/evaluations/{id}").hasAnyRole("ADMIN", "PROFESSOR")
                 .requestMatchers(HttpMethod.POST, "/api/evaluations").hasAnyRole("ADMIN", "PROFESSOR")
@@ -68,6 +74,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.DELETE, "/api/evaluations/{id}").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/evaluations/{id}/grades").hasAnyRole("ADMIN", "PROFESSOR")
                 .requestMatchers(HttpMethod.POST, "/api/evaluations/{id}/grades").hasAnyRole("ADMIN", "PROFESSOR")
+                .requestMatchers(HttpMethod.GET, "/api/evaluations/{id}/submissions").hasAnyRole("ADMIN", "PROFESSOR")
                 .anyRequest().authenticated()
             )
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

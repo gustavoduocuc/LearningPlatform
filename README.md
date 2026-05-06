@@ -184,11 +184,28 @@ curl -X POST http://localhost:8080/api/auth/reset-password \
 | DELETE | `/api/evaluations/{id}` | ADMIN | Elimina una evaluación |
 | GET | `/api/evaluations/{id}/grades` | ADMIN, PROFESSOR | Lista calificaciones de una evaluación |
 | POST | `/api/evaluations/{id}/grades` | ADMIN, PROFESSOR | Asigna una calificación a un estudiante |
+| POST | `/api/evaluations/{id}/submissions` | STUDENT | Estudiante envía tarea/examen (multipart/form-data) |
+| GET | `/api/evaluations/{id}/submissions` | ADMIN, PROFESSOR | Lista envíos de estudiantes para una evaluación |
+| GET | `/api/evaluations/my-evaluations` | STUDENT | Lista evaluaciones de cursos donde está inscrito |
+| GET | `/api/evaluations/{id}/my-submission` | STUDENT | Ver el envío propio para una evaluación |
+| GET | `/api/evaluations/{id}/my-grade` | STUDENT | Ver la calificación asignada para una evaluación |
 
 **Notas:**
 - La calificación debe estar entre 0 y el `maximumScore` de la evaluación
 - Solo estudiantes pueden recibir calificaciones
 - La fecha de aplicación debe ser futura
+
+**Notas sobre envíos (submissions):**
+- Estudiantes solo pueden enviar si están inscritos en el curso de la evaluación
+- Solo se permite un envío por estudiante por evaluación
+- Tipos de archivo permitidos: PDF, DOC, DOCX, ZIP
+- El archivo se almacena como BLOB en la base de datos
+- Los profesores solo pueden ver envíos de evaluaciones de sus propios cursos
+
+**Flujo para estudiantes:**
+1. El estudiante usa `GET /api/evaluations/my-evaluations` para ver evaluaciones disponibles
+2. Con el `evaluationId`, envía la tarea con `POST /api/evaluations/{id}/submissions`
+3. Puede verificar su envío con `GET /api/evaluations/{id}/my-submission`
 
 ### Salud y monitoreo
 
@@ -385,6 +402,154 @@ curl -X POST http://localhost:8080/api/evaluations/1/grades \
 curl http://localhost:8080/api/evaluations/1/grades \
   -H "Authorization: Bearer $TOKEN"
 ```
+
+### 11. Estudiante envía tarea/examen (STUDENT)
+
+**Usando Postman (recomendado):**
+1. Selecciona el endpoint `POST /api/evaluations/{id}/submissions`
+2. En el body, selecciona **form-data**
+3. Agrega un campo `description` (texto, opcional)
+4. Agrega un campo `file` y haz clic en **Select File** para adjuntar tu archivo
+5. Envía la petición
+
+**Usando curl con multipart/form-data:**
+```bash
+# Login como estudiante primero
+STUDENT_TOKEN=$(curl -X POST http://localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "ana@duoc.cl", "password": "estudiante123"}' | jq -r '.token')
+
+# Enviar tarea con archivo adjunto
+curl -X POST http://localhost:8080/api/evaluations/1/submissions \
+  -H "Authorization: Bearer $STUDENT_TOKEN" \
+  -F "description=Mi tarea de Java" \
+  -F "file=@/path/to/tarea.pdf"
+```
+
+**Tipos de archivo permitidos:**
+- `application/pdf` - Archivos PDF
+- `application/msword` - Archivos DOC
+- `application/vnd.openxmlformats-officedocument.wordprocessingml.document` - Archivos DOCX
+- `application/zip` o `application/x-zip-compressed` - Archivos ZIP
+
+**Notas:**
+- El estudiante debe estar inscrito en el curso de la evaluación
+- Solo se permite un envío por estudiante por evaluación
+- El archivo se envía como multipart/form-data, no como JSON
+
+### 12. Profesor revisa envíos de estudiantes (ADMIN o PROFESSOR)
+
+```bash
+# Como profesor, ver los envíos para una evaluación
+curl http://localhost:8080/api/evaluations/1/submissions \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+**Respuesta:**
+```json
+[
+  {
+    "id": 1,
+    "evaluationId": 1,
+    "studentId": 7,
+    "studentName": "Ana García",
+    "description": "Mi tarea de Java",
+    "fileName": "tarea.pdf",
+    "contentType": "application/pdf",
+    "submittedAt": "2025-06-10T14:30:00"
+  }
+]
+```
+
+**Notas:**
+- El profesor solo puede ver envíos de evaluaciones de cursos que imparte
+- El ADMIN puede ver todos los envíos
+- Después de revisar, el profesor puede asignar calificación usando el endpoint de grades
+
+### 13. Estudiante ve sus evaluaciones disponibles (STUDENT)
+
+```bash
+# Como estudiante, ver evaluaciones de cursos donde está inscrito
+curl http://localhost:8080/api/evaluations/my-evaluations \
+  -H "Authorization: Bearer $STUDENT_TOKEN"
+```
+
+**Respuesta:**
+```json
+[
+  {
+    "id": 1,
+    "courseId": 1,
+    "name": "Examen Parcial 1",
+    "maximumScore": 100,
+    "applicationDate": "2025-06-15T10:00:00",
+    "courseTitle": "Introducción a Java"
+  },
+  {
+    "id": 2,
+    "courseId": 2,
+    "name": "Proyecto Final",
+    "maximumScore": 100,
+    "applicationDate": "2025-07-01T10:00:00",
+    "courseTitle": "Base de Datos"
+  }
+]
+```
+
+**Notas:**
+- Solo muestra evaluaciones de cursos donde el estudiante está inscrito
+- El estudiante usa estos IDs para enviar sus tareas/exámenes
+
+### 14. Estudiante ve su propio envío (STUDENT)
+
+```bash
+# Como estudiante, ver el envío que hizo para una evaluación específica
+curl http://localhost:8080/api/evaluations/1/my-submission \
+  -H "Authorization: Bearer $STUDENT_TOKEN"
+```
+
+**Respuesta:**
+```json
+{
+  "id": 1,
+  "evaluationId": 1,
+  "studentId": 7,
+  "studentName": "Ana García",
+  "description": "Mi tarea de Java",
+  "fileName": "tarea.pdf",
+  "contentType": "application/pdf",
+  "submittedAt": "2025-06-10T14:30:00"
+}
+```
+
+**Notas:**
+- Retorna error 404 si el estudiante no ha enviado nada para esta evaluación
+- Solo muestra el envío propio, no los de otros estudiantes
+
+### 15. Estudiante ve su calificación (STUDENT)
+
+```bash
+# Como estudiante, ver la calificación asignada para una evaluación
+curl http://localhost:8080/api/evaluations/1/my-grade \
+  -H "Authorization: Bearer $STUDENT_TOKEN"
+```
+
+**Respuesta:**
+```json
+{
+  "id": 1,
+  "studentId": 7,
+  "evaluationId": 1,
+  "score": 85,
+  "evaluatedAt": "2025-06-20T10:30:00",
+  "studentName": "Ana García",
+  "evaluationName": "Examen Parcial 1"
+}
+```
+
+**Notas:**
+- Retorna error 404 si el profesor aún no ha asignado una calificación
+- La nota está entre 0 y el `maximumScore` de la evaluación
 
 ## Códigos de respuesta
 
