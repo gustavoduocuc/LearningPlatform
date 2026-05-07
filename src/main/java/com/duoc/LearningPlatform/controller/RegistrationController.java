@@ -12,6 +12,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -44,9 +45,13 @@ public class RegistrationController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<RegistrationResponse>> listRegistrations(
             @RequestParam(required = false) Long courseId,
-            @RequestParam(required = false) Long studentId) {
+            @RequestParam(required = false) Long studentId,
+            Authentication authentication) {
         List<Registration> registrations;
-        if (courseId != null) {
+        if (isStudent(authentication)) {
+            Long authenticatedStudentId = findAuthenticatedStudentId(authentication);
+            registrations = registrationService.findByStudentId(authenticatedStudentId);
+        } else if (courseId != null) {
             registrations = registrationService.findByCourseId(courseId);
         } else if (studentId != null) {
             registrations = registrationService.findByStudentId(studentId);
@@ -58,6 +63,21 @@ public class RegistrationController {
                 .map(this::toResponse)
                 .collect(Collectors.toList());
         return ResponseEntity.ok(response);
+    }
+
+    private boolean isStudent(Authentication authentication) {
+        if (authentication == null || authentication.getAuthorities() == null) {
+            return false;
+        }
+        return authentication.getAuthorities().stream()
+                .anyMatch(authority -> authority.getAuthority().equals("ROLE_STUDENT"));
+    }
+
+    private Long findAuthenticatedStudentId(Authentication authentication) {
+        String email = authentication.getName();
+        return userService.findByEmail(email)
+                .map(User::getId)
+                .orElseThrow(() -> new IllegalArgumentException("Authenticated user not found: " + email));
     }
 
     @GetMapping("/{id}")
